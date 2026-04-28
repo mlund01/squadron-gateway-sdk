@@ -2,7 +2,7 @@
 
 Go SDK for building **Squadron gateways**: subprocess integrations
 that bridge a running squadron to an external system (Discord, Slack,
-PagerDuty, custom dashboards, …).
+Microsoft Teams, custom dashboards, …).
 
 ## Concept
 
