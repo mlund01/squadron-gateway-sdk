@@ -1,0 +1,101 @@
+package gateway
+
+import (
+	"time"
+
+	pb "github.com/mlund01/squadron-gateway-sdk/proto"
+)
+
+// Wire conversions between the SDK's Go-friendly types and the
+// generated protobuf messages. Kept in one file so both the gateway
+// (plugin) side and the squadron (host) side share the same encoding.
+
+const wireTimeFormat = time.RFC3339Nano
+
+func recordToProto(r HumanInputRecord) *pb.HumanInputRecord {
+	return &pb.HumanInputRecord{
+		Id:                r.ID,
+		MissionId:         r.MissionID,
+		MissionName:       r.MissionName,
+		TaskId:            r.TaskID,
+		TaskName:          r.TaskName,
+		ToolCallId:        r.ToolCallID,
+		Question:          r.Question,
+		ShortSummary:      r.ShortSummary,
+		AdditionalContext: r.AdditionalContext,
+		Choices:           append([]string(nil), r.Choices...),
+		MultiSelect:       r.MultiSelect,
+		State:             string(r.State),
+		RequestedAt:       formatTime(r.RequestedAt),
+		ResolvedAt:        formatTime(r.ResolvedAt),
+		Response:          r.Response,
+		ResponderUserId:   r.ResponderUserID,
+	}
+}
+
+func recordFromProto(p *pb.HumanInputRecord) HumanInputRecord {
+	if p == nil {
+		return HumanInputRecord{}
+	}
+	return HumanInputRecord{
+		ID:                p.Id,
+		MissionID:         p.MissionId,
+		MissionName:       p.MissionName,
+		TaskID:            p.TaskId,
+		TaskName:          p.TaskName,
+		ToolCallID:        p.ToolCallId,
+		Question:          p.Question,
+		ShortSummary:      p.ShortSummary,
+		AdditionalContext: p.AdditionalContext,
+		Choices:           append([]string(nil), p.Choices...),
+		MultiSelect:       p.MultiSelect,
+		State:             HumanInputState(p.State),
+		RequestedAt:       parseTime(p.RequestedAt),
+		ResolvedAt:        parseTime(p.ResolvedAt),
+		Response:          p.Response,
+		ResponderUserID:   p.ResponderUserId,
+	}
+}
+
+func filterToProto(f HumanInputFilter) *pb.HumanInputFilter {
+	return &pb.HumanInputFilter{
+		State:       string(f.State),
+		MissionId:   f.MissionID,
+		Since:       formatTime(f.Since),
+		OldestFirst: f.OldestFirst,
+		Limit:       int32(f.Limit),
+		Offset:      int32(f.Offset),
+	}
+}
+
+func filterFromProto(p *pb.HumanInputFilter) HumanInputFilter {
+	if p == nil {
+		return HumanInputFilter{}
+	}
+	return HumanInputFilter{
+		State:       HumanInputState(p.State),
+		MissionID:   p.MissionId,
+		Since:       parseTime(p.Since),
+		OldestFirst: p.OldestFirst,
+		Limit:       int(p.Limit),
+		Offset:      int(p.Offset),
+	}
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(wireTimeFormat)
+}
+
+func parseTime(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(wireTimeFormat, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t.UTC()
+}

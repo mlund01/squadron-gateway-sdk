@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package gateway;
+
+option go_package = "github.com/mlund01/squadron-gateway-sdk/proto";
+
+// GatewayService is implemented by the gateway plugin. Squadron calls
+// these methods to push events / configure / control the gateway.
+service GatewayService {
+    // Configure passes settings from HCL config plus a broker stream id
+    // the gateway can use to dial back for SquadronService access.
+    rpc Configure(ConfigureRequest) returns (ConfigureResponse);
+
+    // OnHumanInputRequested is invoked when an agent calls the
+    // builtins.human.ask tool. The gateway should surface the question
+    // in its external system (Discord channel, Slack DM, etc).
+    rpc OnHumanInputRequested(HumanInputRecord) returns (Empty);
+
+    // OnHumanInputResolved is invoked whenever a human-input request
+    // transitions to resolved — including resolutions that came from
+    // some other surface (commander, another gateway). The gateway
+    // should update its external system to reflect the answer.
+    rpc OnHumanInputResolved(HumanInputRecord) returns (Empty);
+
+    // Shutdown asks the gateway to release external resources cleanly
+    // before squadron tears down the subprocess.
+    rpc Shutdown(Empty) returns (Empty);
+}
+
+// SquadronService is implemented by the host (squadron) and registered
+// on a broker stream. Gateways dial it on startup to query / mutate
+// state. Designed to grow over time — additional capabilities (mission
+// listing, run, dataset queries, etc.) get appended here.
+service SquadronService {
+    // ListHumanInputs returns matching records. The `since` filter is
+    // the primary catch-up mechanism: a gateway records the last event
+    // timestamp it processed and asks for everything since.
+    rpc ListHumanInputs(HumanInputFilter) returns (HumanInputList);
+
+    // ResolveHumanInput records an answer from the gateway's external
+    // system. Idempotent — calling twice returns alreadyResolved=true
+    // with the original resolution intact, never an error.
+    rpc ResolveHumanInput(ResolveHumanInputRequest) returns (ResolveHumanInputResponse);
+}
+
+message Empty {}
+
+message ConfigureRequest {
+    map<string, string> settings = 1;
+    // BrokerStreamId is the broker stream the gateway should dial to
+    // get a SquadronService client. Always non-zero.
+    uint32 broker_stream_id = 2;
+}
+
+message ConfigureResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+// HumanInputRecord mirrors the squadron-wire HumanInputRecord type.
+// Kept here as a gRPC-friendly message so the SDK doesn't pull in the
+// wire package's broader dependencies.
+message HumanInputRecord {
+    string id = 1;
+    string mission_id = 2;
+    string mission_name = 3;
+    string task_id = 4;
+    string task_name = 5;
+    string tool_call_id = 6;
+    string question = 7;
+    string short_summary = 8;
+    string additional_context = 9;
+    repeated string choices = 10;
+    string state = 11; // "open" | "resolved"
+    string requested_at = 12; // RFC3339Nano
+    string resolved_at = 13; // RFC3339Nano, empty if open
+    string response = 14;
+    string responder_user_id = 15;
+    // multi_select=true means the human can pick 1+ from choices. The
+    // resolved response is then a JSON-encoded array of strings
+    // (e.g. `["A","C"]`) rather than a single value.
+    bool multi_select = 16;
+}
+
+message HumanInputFilter {
+    string state = 1;        // "open" | "resolved" | "" for both
+    string mission_id = 2;
+    string since = 3;        // RFC3339Nano — match requested_at|resolved_at >= since
+    bool oldest_first = 4;
+    int32 limit = 5;
+    int32 offset = 6;
+}
+
+message HumanInputList {
+    repeated HumanInputRecord items = 1;
+    int32 total = 2;
+}
+
+message ResolveHumanInputRequest {
+    string tool_call_id = 1;
+    string response = 2;
+    string responder_user_id = 3;
+}
+
+message ResolveHumanInputResponse {
+    HumanInputRecord record = 1;
+    // True when the request was already resolved before this call —
+    // the record is the prior resolution, not a fresh one. Gateways
+    // should treat this as success but display "already answered".
+    bool already_resolved = 2;
+    // True when the tool_call_id is unknown to squadron entirely.
+    // Gateways should treat this as a stale event (e.g. the row was
+    // trimmed) rather than retry.
+    bool not_found = 3;
+}
