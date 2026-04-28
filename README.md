@@ -72,13 +72,14 @@ restart. The pattern is:
 request returns `AlreadyResolved=true` with the prior resolution
 intact.
 
-## Releasing
+## Distribution
 
-Squadron pulls gateways from GitHub releases the same way it pulls
-native plugins. Cut a release tag (e.g. `v0.1.0`), upload an
-archive named `<repo>_<GOOS>_<GOARCH>.tar.gz` containing a single
-`gateway` binary, and a `checksums.txt` with sha256 hashes. Squadron
-will download the right archive for the host platform on first load.
+Squadron downloads a gateway's release archive from GitHub on first
+load (same lifecycle as native plugins). The contract:
+
+- Archive: `<repo>_<GOOS>_<GOARCH>.tar.gz` (or `.zip` on Windows).
+- Inside: one `gateway` binary at the root.
+- Sibling: `checksums.txt` with sha256 hashes.
 
 For local development, set `version = "local"` in your squadron
 config and place the binary at
