@@ -57,6 +57,37 @@ func recordFromProto(p *pb.HumanInputRecord) HumanInputRecord {
 	}
 }
 
+func notificationToProto(r NotificationRecord) *pb.NotificationRecord {
+	return &pb.NotificationRecord{
+		MissionId:   r.MissionID,
+		MissionName: r.MissionName,
+		Event:       r.Event,
+		Title:       r.Title,
+		Message:     r.Message,
+		OccurredAt:  formatTime(r.OccurredAt),
+		Error:       r.Error,
+		Channel:     r.Channel,
+		OutputsJson: r.OutputsJSON,
+	}
+}
+
+func notificationFromProto(p *pb.NotificationRecord) NotificationRecord {
+	if p == nil {
+		return NotificationRecord{}
+	}
+	return NotificationRecord{
+		MissionID:   p.MissionId,
+		MissionName: p.MissionName,
+		Event:       p.Event,
+		Title:       p.Title,
+		Message:     p.Message,
+		OccurredAt:  parseTime(p.OccurredAt),
+		Error:       p.Error,
+		Channel:     p.Channel,
+		OutputsJSON: p.OutputsJson,
+	}
+}
+
 func filterToProto(f HumanInputFilter) *pb.HumanInputFilter {
 	return &pb.HumanInputFilter{
 		State:       string(f.State),

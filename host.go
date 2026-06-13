@@ -111,6 +111,12 @@ func (g *GRPCGatewayClient) OnHumanInputResolved(ctx context.Context, rec HumanI
 	return err
 }
 
+// OnNotification forwards a mission-lifecycle notification to the gateway.
+func (g *GRPCGatewayClient) OnNotification(ctx context.Context, rec NotificationRecord) error {
+	_, err := g.client.OnNotification(ctx, notificationToProto(rec))
+	return err
+}
+
 // Shutdown asks the gateway to clean up before squadron kills the
 // subprocess. Best-effort — squadron should tear down the subprocess
 // regardless of return value.

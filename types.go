@@ -81,6 +81,28 @@ type HumanInputRecord struct {
 	ResponderUserID   string
 }
 
+// NotificationRecord describes a single mission-lifecycle notification
+// pushed to the gateway. Notifications are one-way and informational —
+// unlike human-input requests there is nothing for the user to resolve.
+type NotificationRecord struct {
+	MissionID   string
+	MissionName string
+	// Event is one of "mission_completed", "mission_failed",
+	// "mission_stopped".
+	Event       string
+	Title       string
+	Message     string
+	OccurredAt  time.Time
+	// Error is set when Event is "mission_failed", empty otherwise.
+	Error string
+	// Channel is an optional per-mission destination override. When
+	// empty the gateway posts to its globally configured default channel.
+	Channel string
+	// OutputsJSON is the JSON-encoded map of task name -> structured
+	// output, set when Event is "mission_completed".
+	OutputsJSON string
+}
+
 // HumanInputFilter narrows a ListHumanInputs call. Zero-valued fields
 // are not applied (so a fresh HumanInputFilter{} returns everything).
 type HumanInputFilter struct {
@@ -160,6 +182,12 @@ type Gateway interface {
 	// commander operator, another gateway, the agent timing out).
 	// Gateways update their external surface to reflect the answer.
 	OnHumanInputResolved(ctx context.Context, rec HumanInputRecord) error
+
+	// OnNotification is invoked when a mission reaches a terminal state
+	// (completed, failed, stopped) and the mission opted into gateway
+	// notifications. Gateways post an informational message to their
+	// external system; there is nothing for the user to act on.
+	OnNotification(ctx context.Context, rec NotificationRecord) error
 
 	// Shutdown is invoked once when squadron is tearing the subprocess
 	// down. Release external resources here (close the Discord

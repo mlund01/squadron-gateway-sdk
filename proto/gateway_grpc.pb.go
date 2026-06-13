@@ -22,6 +22,7 @@ const (
 	GatewayService_Configure_FullMethodName             = "/gateway.GatewayService/Configure"
 	GatewayService_OnHumanInputRequested_FullMethodName = "/gateway.GatewayService/OnHumanInputRequested"
 	GatewayService_OnHumanInputResolved_FullMethodName  = "/gateway.GatewayService/OnHumanInputResolved"
+	GatewayService_OnNotification_FullMethodName        = "/gateway.GatewayService/OnNotification"
 	GatewayService_Shutdown_FullMethodName              = "/gateway.GatewayService/Shutdown"
 )
 
@@ -44,6 +45,12 @@ type GatewayServiceClient interface {
 	// some other surface (commander, another gateway). The gateway
 	// should update its external system to reflect the answer.
 	OnHumanInputResolved(ctx context.Context, in *HumanInputRecord, opts ...grpc.CallOption) (*Empty, error)
+	// OnNotification is invoked when a mission reaches a terminal state
+	// (completed, failed, stopped) and the mission opted into gateway
+	// notifications. The gateway posts an informational message to its
+	// external system. Unlike human-input, notifications are one-way:
+	// there is nothing for the user to act on.
+	OnNotification(ctx context.Context, in *NotificationRecord, opts ...grpc.CallOption) (*Empty, error)
 	// Shutdown asks the gateway to release external resources cleanly
 	// before squadron tears down the subprocess.
 	Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
@@ -87,6 +94,16 @@ func (c *gatewayServiceClient) OnHumanInputResolved(ctx context.Context, in *Hum
 	return out, nil
 }
 
+func (c *gatewayServiceClient) OnNotification(ctx context.Context, in *NotificationRecord, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, GatewayService_OnNotification_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gatewayServiceClient) Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -116,6 +133,12 @@ type GatewayServiceServer interface {
 	// some other surface (commander, another gateway). The gateway
 	// should update its external system to reflect the answer.
 	OnHumanInputResolved(context.Context, *HumanInputRecord) (*Empty, error)
+	// OnNotification is invoked when a mission reaches a terminal state
+	// (completed, failed, stopped) and the mission opted into gateway
+	// notifications. The gateway posts an informational message to its
+	// external system. Unlike human-input, notifications are one-way:
+	// there is nothing for the user to act on.
+	OnNotification(context.Context, *NotificationRecord) (*Empty, error)
 	// Shutdown asks the gateway to release external resources cleanly
 	// before squadron tears down the subprocess.
 	Shutdown(context.Context, *Empty) (*Empty, error)
@@ -137,6 +160,9 @@ func (UnimplementedGatewayServiceServer) OnHumanInputRequested(context.Context, 
 }
 func (UnimplementedGatewayServiceServer) OnHumanInputResolved(context.Context, *HumanInputRecord) (*Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method OnHumanInputResolved not implemented")
+}
+func (UnimplementedGatewayServiceServer) OnNotification(context.Context, *NotificationRecord) (*Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method OnNotification not implemented")
 }
 func (UnimplementedGatewayServiceServer) Shutdown(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method Shutdown not implemented")
@@ -216,6 +242,24 @@ func _GatewayService_OnHumanInputResolved_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_OnNotification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotificationRecord)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).OnNotification(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_OnNotification_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).OnNotification(ctx, req.(*NotificationRecord))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -252,6 +296,10 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "OnHumanInputResolved",
 			Handler:    _GatewayService_OnHumanInputResolved_Handler,
+		},
+		{
+			MethodName: "OnNotification",
+			Handler:    _GatewayService_OnNotification_Handler,
 		},
 		{
 			MethodName: "Shutdown",

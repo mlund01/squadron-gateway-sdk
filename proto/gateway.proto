@@ -22,6 +22,13 @@ service GatewayService {
     // should update its external system to reflect the answer.
     rpc OnHumanInputResolved(HumanInputRecord) returns (Empty);
 
+    // OnNotification is invoked when a mission reaches a terminal state
+    // (completed, failed, stopped) and the mission opted into gateway
+    // notifications. The gateway posts an informational message to its
+    // external system. Unlike human-input, notifications are one-way:
+    // there is nothing for the user to act on.
+    rpc OnNotification(NotificationRecord) returns (Empty);
+
     // Shutdown asks the gateway to release external resources cleanly
     // before squadron tears down the subprocess.
     rpc Shutdown(Empty) returns (Empty);
@@ -112,4 +119,26 @@ message ResolveHumanInputResponse {
     // Gateways should treat this as a stale event (e.g. the row was
     // trimmed) rather than retry.
     bool not_found = 3;
+}
+
+// NotificationRecord describes a single mission-lifecycle notification.
+// All fields are flat strings so the schema stays language-neutral.
+message NotificationRecord {
+    string mission_id = 1;
+    string mission_name = 2;
+    // event is one of "mission_completed", "mission_failed",
+    // "mission_stopped".
+    string event = 3;
+    string title = 4;
+    string message = 5;
+    string occurred_at = 6; // RFC3339Nano
+    // error is set for "mission_failed", empty otherwise.
+    string error = 7;
+    // channel is an optional per-mission destination override. When
+    // empty the gateway posts to its globally configured default
+    // channel.
+    string channel = 8;
+    // outputs_json is the JSON-encoded map of task name -> structured
+    // output, populated for "mission_completed" only.
+    string outputs_json = 9;
 }
