@@ -54,7 +54,7 @@ func (g *myGateway) OnHumanInputResolved(ctx context.Context, rec gateway.HumanI
 
 func (g *myGateway) OnNotification(ctx context.Context, rec gateway.NotificationRecord) error {
     // one-way mission-lifecycle post; rec.Channel optionally overrides the
-    // destination, rec.OutputsJSON carries task outputs on mission_completed
+    // destination channel
     g.post(rec)
     return nil
 }

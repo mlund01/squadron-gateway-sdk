@@ -126,8 +126,7 @@ message ResolveHumanInputResponse {
 message NotificationRecord {
     string mission_id = 1;
     string mission_name = 2;
-    // event is one of "mission_completed", "mission_failed",
-    // "mission_stopped".
+    // event is one of "mission_completed" or "mission_failed".
     string event = 3;
     string title = 4;
     string message = 5;
@@ -138,7 +137,4 @@ message NotificationRecord {
     // empty the gateway posts to its globally configured default
     // channel.
     string channel = 8;
-    // outputs_json is the JSON-encoded map of task name -> structured
-    // output, populated for "mission_completed" only.
-    string outputs_json = 9;
 }

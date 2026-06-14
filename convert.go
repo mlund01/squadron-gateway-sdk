@@ -67,7 +67,6 @@ func notificationToProto(r NotificationRecord) *pb.NotificationRecord {
 		OccurredAt:  formatTime(r.OccurredAt),
 		Error:       r.Error,
 		Channel:     r.Channel,
-		OutputsJson: r.OutputsJSON,
 	}
 }
 
@@ -84,7 +83,6 @@ func notificationFromProto(p *pb.NotificationRecord) NotificationRecord {
 		OccurredAt:  parseTime(p.OccurredAt),
 		Error:       p.Error,
 		Channel:     p.Channel,
-		OutputsJSON: p.OutputsJson,
 	}
 }
 

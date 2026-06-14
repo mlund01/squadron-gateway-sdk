@@ -87,20 +87,16 @@ type HumanInputRecord struct {
 type NotificationRecord struct {
 	MissionID   string
 	MissionName string
-	// Event is one of "mission_completed", "mission_failed",
-	// "mission_stopped".
-	Event       string
-	Title       string
-	Message     string
-	OccurredAt  time.Time
+	// Event is one of "mission_completed" or "mission_failed".
+	Event      string
+	Title      string
+	Message    string
+	OccurredAt time.Time
 	// Error is set when Event is "mission_failed", empty otherwise.
 	Error string
 	// Channel is an optional per-mission destination override. When
 	// empty the gateway posts to its globally configured default channel.
 	Channel string
-	// OutputsJSON is the JSON-encoded map of task name -> structured
-	// output, set when Event is "mission_completed".
-	OutputsJSON string
 }
 
 // HumanInputFilter narrows a ListHumanInputs call. Zero-valued fields

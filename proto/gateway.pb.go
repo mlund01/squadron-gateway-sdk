@@ -601,8 +601,7 @@ type NotificationRecord struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	MissionId   string                 `protobuf:"bytes,1,opt,name=mission_id,json=missionId,proto3" json:"mission_id,omitempty"`
 	MissionName string                 `protobuf:"bytes,2,opt,name=mission_name,json=missionName,proto3" json:"mission_name,omitempty"`
-	// event is one of "mission_completed", "mission_failed",
-	// "mission_stopped".
+	// event is one of "mission_completed" or "mission_failed".
 	Event      string `protobuf:"bytes,3,opt,name=event,proto3" json:"event,omitempty"`
 	Title      string `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	Message    string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
@@ -612,10 +611,7 @@ type NotificationRecord struct {
 	// channel is an optional per-mission destination override. When
 	// empty the gateway posts to its globally configured default
 	// channel.
-	Channel string `protobuf:"bytes,8,opt,name=channel,proto3" json:"channel,omitempty"`
-	// outputs_json is the JSON-encoded map of task name -> structured
-	// output, populated for "mission_completed" only.
-	OutputsJson   string `protobuf:"bytes,9,opt,name=outputs_json,json=outputsJson,proto3" json:"outputs_json,omitempty"`
+	Channel       string `protobuf:"bytes,8,opt,name=channel,proto3" json:"channel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -706,13 +702,6 @@ func (x *NotificationRecord) GetChannel() string {
 	return ""
 }
 
-func (x *NotificationRecord) GetOutputsJson() string {
-	if x != nil {
-		return x.OutputsJson
-	}
-	return ""
-}
-
 var File_proto_gateway_proto protoreflect.FileDescriptor
 
 const file_proto_gateway_proto_rawDesc = "" +
@@ -768,7 +757,7 @@ const file_proto_gateway_proto_rawDesc = "" +
 	"\x19ResolveHumanInputResponse\x121\n" +
 	"\x06record\x18\x01 \x01(\v2\x19.gateway.HumanInputRecordR\x06record\x12)\n" +
 	"\x10already_resolved\x18\x02 \x01(\bR\x0falreadyResolved\x12\x1b\n" +
-	"\tnot_found\x18\x03 \x01(\bR\bnotFound\"\x90\x02\n" +
+	"\tnot_found\x18\x03 \x01(\bR\bnotFound\"\xed\x01\n" +
 	"\x12NotificationRecord\x12\x1d\n" +
 	"\n" +
 	"mission_id\x18\x01 \x01(\tR\tmissionId\x12!\n" +
@@ -779,8 +768,7 @@ const file_proto_gateway_proto_rawDesc = "" +
 	"\voccurred_at\x18\x06 \x01(\tR\n" +
 	"occurredAt\x12\x14\n" +
 	"\x05error\x18\a \x01(\tR\x05error\x12\x18\n" +
-	"\achannel\x18\b \x01(\tR\achannel\x12!\n" +
-	"\foutputs_json\x18\t \x01(\tR\voutputsJson2\xc6\x02\n" +
+	"\achannel\x18\b \x01(\tR\achannel2\xc6\x02\n" +
 	"\x0eGatewayService\x12B\n" +
 	"\tConfigure\x12\x19.gateway.ConfigureRequest\x1a\x1a.gateway.ConfigureResponse\x12B\n" +
 	"\x15OnHumanInputRequested\x12\x19.gateway.HumanInputRecord\x1a\x0e.gateway.Empty\x12A\n" +
