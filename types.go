@@ -99,6 +99,14 @@ type NotificationRecord struct {
 	Channel string
 }
 
+// PostMessageRequest is a free-form message an agent asked the gateway to
+// post. Channel is an optional destination override (name or id); empty posts
+// to the gateway's configured default channel.
+type PostMessageRequest struct {
+	Channel string
+	Text    string
+}
+
 // HumanInputFilter narrows a ListHumanInputs call. Zero-valued fields
 // are not applied (so a fresh HumanInputFilter{} returns everything).
 type HumanInputFilter struct {
@@ -184,6 +192,11 @@ type Gateway interface {
 	// notifications. Gateways post an informational message to their
 	// external system; there is nothing for the user to act on.
 	OnNotification(ctx context.Context, rec NotificationRecord) error
+
+	// PostMessage posts a free-form text message to the gateway's external
+	// system, optionally to a channel override. Backs the
+	// builtins.gateway.post tool.
+	PostMessage(ctx context.Context, req PostMessageRequest) error
 
 	// Shutdown is invoked once when squadron is tearing the subprocess
 	// down. Release external resources here (close the Discord

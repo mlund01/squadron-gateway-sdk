@@ -23,6 +23,7 @@ const (
 	GatewayService_OnHumanInputRequested_FullMethodName = "/gateway.GatewayService/OnHumanInputRequested"
 	GatewayService_OnHumanInputResolved_FullMethodName  = "/gateway.GatewayService/OnHumanInputResolved"
 	GatewayService_OnNotification_FullMethodName        = "/gateway.GatewayService/OnNotification"
+	GatewayService_PostMessage_FullMethodName           = "/gateway.GatewayService/PostMessage"
 	GatewayService_Shutdown_FullMethodName              = "/gateway.GatewayService/Shutdown"
 )
 
@@ -51,6 +52,11 @@ type GatewayServiceClient interface {
 	// external system. Unlike human-input, notifications are one-way:
 	// there is nothing for the user to act on.
 	OnNotification(ctx context.Context, in *NotificationRecord, opts ...grpc.CallOption) (*Empty, error)
+	// PostMessage posts an arbitrary text message to the gateway's external
+	// system. Squadron exposes this to agents via the builtins.gateway.post
+	// tool, so an agent can send a message to the configured channel (or a
+	// per-call channel override).
+	PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*Empty, error)
 	// Shutdown asks the gateway to release external resources cleanly
 	// before squadron tears down the subprocess.
 	Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
@@ -104,6 +110,16 @@ func (c *gatewayServiceClient) OnNotification(ctx context.Context, in *Notificat
 	return out, nil
 }
 
+func (c *gatewayServiceClient) PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, GatewayService_PostMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gatewayServiceClient) Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -139,6 +155,11 @@ type GatewayServiceServer interface {
 	// external system. Unlike human-input, notifications are one-way:
 	// there is nothing for the user to act on.
 	OnNotification(context.Context, *NotificationRecord) (*Empty, error)
+	// PostMessage posts an arbitrary text message to the gateway's external
+	// system. Squadron exposes this to agents via the builtins.gateway.post
+	// tool, so an agent can send a message to the configured channel (or a
+	// per-call channel override).
+	PostMessage(context.Context, *PostMessageRequest) (*Empty, error)
 	// Shutdown asks the gateway to release external resources cleanly
 	// before squadron tears down the subprocess.
 	Shutdown(context.Context, *Empty) (*Empty, error)
@@ -163,6 +184,9 @@ func (UnimplementedGatewayServiceServer) OnHumanInputResolved(context.Context, *
 }
 func (UnimplementedGatewayServiceServer) OnNotification(context.Context, *NotificationRecord) (*Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method OnNotification not implemented")
+}
+func (UnimplementedGatewayServiceServer) PostMessage(context.Context, *PostMessageRequest) (*Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method PostMessage not implemented")
 }
 func (UnimplementedGatewayServiceServer) Shutdown(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method Shutdown not implemented")
@@ -260,6 +284,24 @@ func _GatewayService_OnNotification_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_PostMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PostMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).PostMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_PostMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).PostMessage(ctx, req.(*PostMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -300,6 +342,10 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "OnNotification",
 			Handler:    _GatewayService_OnNotification_Handler,
+		},
+		{
+			MethodName: "PostMessage",
+			Handler:    _GatewayService_PostMessage_Handler,
 		},
 		{
 			MethodName: "Shutdown",

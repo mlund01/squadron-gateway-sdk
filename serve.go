@@ -125,6 +125,13 @@ func (s *gatewayServer) OnNotification(ctx context.Context, p *pb.NotificationRe
 	return &pb.Empty{}, nil
 }
 
+func (s *gatewayServer) PostMessage(ctx context.Context, p *pb.PostMessageRequest) (*pb.Empty, error) {
+	if err := s.impl.PostMessage(ctx, postMessageFromProto(p)); err != nil {
+		return nil, err
+	}
+	return &pb.Empty{}, nil
+}
+
 func (s *gatewayServer) Shutdown(ctx context.Context, _ *pb.Empty) (*pb.Empty, error) {
 	if err := s.impl.Shutdown(ctx); err != nil {
 		return nil, err

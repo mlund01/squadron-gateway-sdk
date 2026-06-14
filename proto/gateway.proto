@@ -29,9 +29,23 @@ service GatewayService {
     // there is nothing for the user to act on.
     rpc OnNotification(NotificationRecord) returns (Empty);
 
+    // PostMessage posts an arbitrary text message to the gateway's external
+    // system. Squadron exposes this to agents via the builtins.gateway.post
+    // tool, so an agent can send a message to the configured channel (or a
+    // per-call channel override).
+    rpc PostMessage(PostMessageRequest) returns (Empty);
+
     // Shutdown asks the gateway to release external resources cleanly
     // before squadron tears down the subprocess.
     rpc Shutdown(Empty) returns (Empty);
+}
+
+// PostMessageRequest is a free-form message to post to the gateway.
+message PostMessageRequest {
+    // channel is an optional destination override (channel name or id).
+    // Empty posts to the gateway's globally configured default channel.
+    string channel = 1;
+    string text = 2;
 }
 
 // SquadronService is implemented by the host (squadron) and registered

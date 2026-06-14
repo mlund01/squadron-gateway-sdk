@@ -12,10 +12,11 @@ lifecycle as plugins) and connects to it over a bidirectional gRPC
 channel:
 
 - **Squadron → Gateway**: pushes events (`OnHumanInputRequested`,
-  `OnHumanInputResolved`, `OnNotification`, …) so the gateway can mirror
-  state to its external system. `OnNotification` is a one-way
-  mission-lifecycle post (`mission_completed` / `mission_failed`) —
-  informational, with nothing for the user to act on.
+  `OnHumanInputResolved`, `OnNotification`, `PostMessage`, …) so the gateway
+  can mirror state to its external system. `OnNotification` is a one-way
+  mission-lifecycle post (`mission_completed` / `mission_failed`); `PostMessage`
+  posts an arbitrary agent-authored message (backs the `builtins.gateway.post`
+  tool) — both informational, with nothing for the user to act on.
 - **Gateway → Squadron**: pulls / mutates state (`ListHumanInputs`,
   `ResolveHumanInput`, …) so user actions in the external system flow
   back to squadron.
@@ -59,11 +60,19 @@ func (g *myGateway) OnNotification(ctx context.Context, rec gateway.Notification
     return nil
 }
 
+func (g *myGateway) PostMessage(ctx context.Context, req gateway.PostMessageRequest) error {
+    // free-form agent-authored message; req.Channel optionally overrides the
+    // destination channel
+    g.send(req)
+    return nil
+}
+
 func (g *myGateway) Shutdown(ctx context.Context) error { return nil }
 
 func (g *myGateway) show(_ gateway.HumanInputRecord)         {}
 func (g *myGateway) markAnswered(_ gateway.HumanInputRecord) {}
 func (g *myGateway) post(_ gateway.NotificationRecord)       {}
+func (g *myGateway) send(_ gateway.PostMessageRequest)       {}
 
 func main() { gateway.Serve(&myGateway{}) }
 ```

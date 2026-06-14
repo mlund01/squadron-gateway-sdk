@@ -117,6 +117,12 @@ func (g *GRPCGatewayClient) OnNotification(ctx context.Context, rec Notification
 	return err
 }
 
+// PostMessage forwards a free-form post request to the gateway.
+func (g *GRPCGatewayClient) PostMessage(ctx context.Context, req PostMessageRequest) error {
+	_, err := g.client.PostMessage(ctx, postMessageToProto(req))
+	return err
+}
+
 // Shutdown asks the gateway to clean up before squadron kills the
 // subprocess. Best-effort — squadron should tear down the subprocess
 // regardless of return value.

@@ -86,6 +86,17 @@ func notificationFromProto(p *pb.NotificationRecord) NotificationRecord {
 	}
 }
 
+func postMessageToProto(r PostMessageRequest) *pb.PostMessageRequest {
+	return &pb.PostMessageRequest{Channel: r.Channel, Text: r.Text}
+}
+
+func postMessageFromProto(p *pb.PostMessageRequest) PostMessageRequest {
+	if p == nil {
+		return PostMessageRequest{}
+	}
+	return PostMessageRequest{Channel: p.Channel, Text: p.Text}
+}
+
 func filterToProto(f HumanInputFilter) *pb.HumanInputFilter {
 	return &pb.HumanInputFilter{
 		State:       string(f.State),
