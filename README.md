@@ -14,8 +14,8 @@ channel:
 - **Squadron → Gateway**: pushes events (`OnHumanInputRequested`,
   `OnHumanInputResolved`, `OnNotification`, …) so the gateway can mirror
   state to its external system. `OnNotification` is a one-way
-  mission-lifecycle post (`mission_completed` / `mission_failed` /
-  `mission_stopped`) — informational, with nothing for the user to act on.
+  mission-lifecycle post (`mission_completed` / `mission_failed`) —
+  informational, with nothing for the user to act on.
 - **Gateway → Squadron**: pulls / mutates state (`ListHumanInputs`,
   `ResolveHumanInput`, …) so user actions in the external system flow
   back to squadron.
