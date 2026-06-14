@@ -12,8 +12,10 @@ lifecycle as plugins) and connects to it over a bidirectional gRPC
 channel:
 
 - **Squadron → Gateway**: pushes events (`OnHumanInputRequested`,
-  `OnHumanInputResolved`, …) so the gateway can mirror state to its
-  external system.
+  `OnHumanInputResolved`, `OnNotification`, …) so the gateway can mirror
+  state to its external system. `OnNotification` is a one-way
+  mission-lifecycle post (`mission_completed` / `mission_failed` /
+  `mission_stopped`) — informational, with nothing for the user to act on.
 - **Gateway → Squadron**: pulls / mutates state (`ListHumanInputs`,
   `ResolveHumanInput`, …) so user actions in the external system flow
   back to squadron.
@@ -50,10 +52,18 @@ func (g *myGateway) OnHumanInputResolved(ctx context.Context, rec gateway.HumanI
     return nil
 }
 
+func (g *myGateway) OnNotification(ctx context.Context, rec gateway.NotificationRecord) error {
+    // one-way mission-lifecycle post; rec.Channel optionally overrides the
+    // destination, rec.OutputsJSON carries task outputs on mission_completed
+    g.post(rec)
+    return nil
+}
+
 func (g *myGateway) Shutdown(ctx context.Context) error { return nil }
 
 func (g *myGateway) show(_ gateway.HumanInputRecord)         {}
 func (g *myGateway) markAnswered(_ gateway.HumanInputRecord) {}
+func (g *myGateway) post(_ gateway.NotificationRecord)       {}
 
 func main() { gateway.Serve(&myGateway{}) }
 ```
