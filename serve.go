@@ -132,6 +132,14 @@ func (s *gatewayServer) PostMessage(ctx context.Context, p *pb.PostMessageReques
 	return &pb.Empty{}, nil
 }
 
+func (s *gatewayServer) MessageToolSpec(ctx context.Context, _ *pb.Empty) (*pb.MessageToolSpecResponse, error) {
+	spec, err := s.impl.MessageToolSpec(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return messageToolSpecToProto(spec), nil
+}
+
 func (s *gatewayServer) Shutdown(ctx context.Context, _ *pb.Empty) (*pb.Empty, error) {
 	if err := s.impl.Shutdown(ctx); err != nil {
 		return nil, err

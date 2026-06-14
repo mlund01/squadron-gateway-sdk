@@ -87,14 +87,25 @@ func notificationFromProto(p *pb.NotificationRecord) NotificationRecord {
 }
 
 func postMessageToProto(r PostMessageRequest) *pb.PostMessageRequest {
-	return &pb.PostMessageRequest{Channel: r.Channel, Text: r.Text}
+	return &pb.PostMessageRequest{Payload: r.Payload}
 }
 
 func postMessageFromProto(p *pb.PostMessageRequest) PostMessageRequest {
 	if p == nil {
 		return PostMessageRequest{}
 	}
-	return PostMessageRequest{Channel: p.Channel, Text: p.Text}
+	return PostMessageRequest{Payload: p.Payload}
+}
+
+func messageToolSpecToProto(s MessageToolSpec) *pb.MessageToolSpecResponse {
+	return &pb.MessageToolSpecResponse{Description: s.Description, ParamsSchemaJson: s.ParamsSchema}
+}
+
+func messageToolSpecFromProto(p *pb.MessageToolSpecResponse) MessageToolSpec {
+	if p == nil {
+		return MessageToolSpec{}
+	}
+	return MessageToolSpec{Description: p.Description, ParamsSchema: p.ParamsSchemaJson}
 }
 
 func filterToProto(f HumanInputFilter) *pb.HumanInputFilter {

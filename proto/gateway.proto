@@ -29,23 +29,40 @@ service GatewayService {
     // there is nothing for the user to act on.
     rpc OnNotification(NotificationRecord) returns (Empty);
 
-    // PostMessage posts an arbitrary text message to the gateway's external
-    // system. Squadron exposes this to agents via the builtins.gateway.post
-    // tool, so an agent can send a message to the configured channel (or a
-    // per-call channel override).
+    // PostMessage posts a message to the gateway's external system. Squadron
+    // exposes this to agents via the builtins.gateway.post tool. The payload
+    // is the raw JSON the agent produced for the tool, matching the schema the
+    // gateway advertised via MessageToolSpec — the gateway owns the message
+    // contract (text, formatting, channel override, attachments, …) and parses
+    // the payload itself.
     rpc PostMessage(PostMessageRequest) returns (Empty);
+
+    // MessageToolSpec returns how the builtins.gateway.post tool should be
+    // presented to the LLM for this gateway: a description (formatting docs)
+    // and an optional JSON Schema for the tool's parameters. Squadron fetches
+    // it once the gateway is up and builds the tool from it, so each gateway
+    // can advertise exactly the rich-message shape it accepts.
+    rpc MessageToolSpec(Empty) returns (MessageToolSpecResponse);
 
     // Shutdown asks the gateway to release external resources cleanly
     // before squadron tears down the subprocess.
     rpc Shutdown(Empty) returns (Empty);
 }
 
-// PostMessageRequest is a free-form message to post to the gateway.
+// PostMessageRequest carries the raw, gateway-schema-shaped JSON the agent
+// produced. The gateway parses it (text, channel override, attachments, …).
 message PostMessageRequest {
-    // channel is an optional destination override (channel name or id).
-    // Empty posts to the gateway's globally configured default channel.
-    string channel = 1;
-    string text = 2;
+    string payload = 1;
+}
+
+// MessageToolSpecResponse describes the builtins.gateway.post tool.
+message MessageToolSpecResponse {
+    // description is appended to the tool description so the LLM knows how to
+    // format messages for this gateway.
+    string description = 1;
+    // params_schema_json is an optional JSON Schema (object) for the tool's
+    // parameters. Empty → squadron uses a default { message } schema.
+    string params_schema_json = 2;
 }
 
 // SquadronService is implemented by the host (squadron) and registered

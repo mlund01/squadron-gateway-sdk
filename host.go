@@ -117,10 +117,19 @@ func (g *GRPCGatewayClient) OnNotification(ctx context.Context, rec Notification
 	return err
 }
 
-// PostMessage forwards a free-form post request to the gateway.
+// PostMessage forwards a post request to the gateway.
 func (g *GRPCGatewayClient) PostMessage(ctx context.Context, req PostMessageRequest) error {
 	_, err := g.client.PostMessage(ctx, postMessageToProto(req))
 	return err
+}
+
+// MessageToolSpec fetches the post-tool spec from the gateway.
+func (g *GRPCGatewayClient) MessageToolSpec(ctx context.Context) (MessageToolSpec, error) {
+	resp, err := g.client.MessageToolSpec(ctx, &pb.Empty{})
+	if err != nil {
+		return MessageToolSpec{}, err
+	}
+	return messageToolSpecFromProto(resp), nil
 }
 
 // Shutdown asks the gateway to clean up before squadron kills the
