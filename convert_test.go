@@ -159,3 +159,80 @@ func TestRecordFromProtoNilIsSafe(t *testing.T) {
 		t.Errorf("nil record should yield zero-value HumanInputRecord, got %+v", got)
 	}
 }
+
+func TestNotificationRoundTripPreservesEveryField(t *testing.T) {
+	occurred := time.Now().UTC().Truncate(time.Nanosecond)
+	original := NotificationRecord{
+		MissionID:   "m-1",
+		MissionName: "critical",
+		Event:       "mission_failed",
+		Title:       "Mission failed",
+		Message:     "task crashed",
+		OccurredAt:  occurred,
+		Error:       "boom",
+		Channel:     "#ops-alerts",
+	}
+
+	got := notificationFromProto(notificationToProto(original))
+
+	if !got.OccurredAt.Equal(original.OccurredAt) {
+		t.Errorf("OccurredAt: got %v, want %v", got.OccurredAt, original.OccurredAt)
+	}
+	got.OccurredAt = time.Time{}
+	original.OccurredAt = time.Time{}
+	if got != original {
+		t.Errorf("notification round-trip lost a field: got %+v, want %+v", got, original)
+	}
+}
+
+func TestNotificationRoundTripHandlesZeroOccurredAt(t *testing.T) {
+	// mission_completed with no explicit timestamp must round-trip the
+	// zero time as zero, not "0001-01-01".
+	got := notificationFromProto(notificationToProto(NotificationRecord{
+		Event: "mission_completed",
+	}))
+	if !got.OccurredAt.IsZero() {
+		t.Errorf("zero OccurredAt must round-trip as zero; got %v", got.OccurredAt)
+	}
+}
+
+func TestNotificationFromProtoNilIsSafe(t *testing.T) {
+	got := notificationFromProto(nil)
+	if got != (NotificationRecord{}) {
+		t.Errorf("nil notification should yield zero-value NotificationRecord, got %+v", got)
+	}
+}
+
+func TestPostMessageRoundTripPreservesPayload(t *testing.T) {
+	original := PostMessageRequest{Payload: `{"text":"deploy done","channel":"#ops"}`}
+	got := postMessageFromProto(postMessageToProto(original))
+	if got != original {
+		t.Errorf("payload must survive round-trip verbatim: got %+v, want %+v", got, original)
+	}
+}
+
+func TestPostMessageFromProtoNilIsSafe(t *testing.T) {
+	got := postMessageFromProto(nil)
+	if got != (PostMessageRequest{}) {
+		t.Errorf("nil request should yield zero-value PostMessageRequest, got %+v", got)
+	}
+}
+
+func TestMessageToolSpecRoundTripPreservesEveryField(t *testing.T) {
+	original := MessageToolSpec{
+		Description: "Post to Discord. text supports markdown.",
+		ParamsSchema: `{"type":"object","properties":{"text":{"type":"string"}},` +
+			`"required":["text"]}`,
+	}
+	got := messageToolSpecFromProto(messageToolSpecToProto(original))
+	if got != original {
+		t.Errorf("spec round-trip lost a field: got %+v, want %+v", got, original)
+	}
+}
+
+func TestMessageToolSpecFromProtoNilIsSafe(t *testing.T) {
+	got := messageToolSpecFromProto(nil)
+	if got != (MessageToolSpec{}) {
+		t.Errorf("nil response should yield zero-value MessageToolSpec, got %+v", got)
+	}
+}
