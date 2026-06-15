@@ -87,14 +87,30 @@ func notificationFromProto(p *pb.NotificationRecord) NotificationRecord {
 }
 
 func postMessageToProto(r PostMessageRequest) *pb.PostMessageRequest {
-	return &pb.PostMessageRequest{Payload: r.Payload}
+	out := &pb.PostMessageRequest{Payload: r.Payload}
+	for _, a := range r.Attachments {
+		out.Attachments = append(out.Attachments, &pb.FileAttachment{
+			Filename: a.Filename,
+			MimeType: a.MimeType,
+			Content:  a.Content,
+		})
+	}
+	return out
 }
 
 func postMessageFromProto(p *pb.PostMessageRequest) PostMessageRequest {
 	if p == nil {
 		return PostMessageRequest{}
 	}
-	return PostMessageRequest{Payload: p.Payload}
+	req := PostMessageRequest{Payload: p.Payload}
+	for _, a := range p.Attachments {
+		req.Attachments = append(req.Attachments, FileAttachment{
+			Filename: a.Filename,
+			MimeType: a.MimeType,
+			Content:  a.Content,
+		})
+	}
+	return req
 }
 
 func messageToolSpecToProto(s MessageToolSpec) *pb.MessageToolSpecResponse {

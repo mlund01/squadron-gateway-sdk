@@ -11,6 +11,12 @@ import (
 	pb "github.com/mlund01/squadron-gateway-sdk/proto"
 )
 
+// MaxGRPCMessageBytes is the gRPC message-size limit for the gateway<->squadron
+// channel. It is raised well above gRPC's 4 MB default so file attachments
+// (shipped as raw bytes in PostMessageRequest) fit. Squadron caps individual
+// attachments below this.
+const MaxGRPCMessageBytes = 32 << 20 // 32 MiB
+
 // Serve is the entry point for a gateway binary. Call it from main()
 // after constructing the gateway implementation. Serve blocks until
 // squadron tears down the subprocess.
@@ -26,7 +32,13 @@ func Serve(impl Gateway) {
 		Plugins: map[string]plugin.Plugin{
 			PluginName: &gatewayPluginImpl{Impl: impl},
 		},
-		GRPCServer: plugin.DefaultGRPCServer,
+		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
+			opts = append(opts,
+				grpc.MaxRecvMsgSize(MaxGRPCMessageBytes),
+				grpc.MaxSendMsgSize(MaxGRPCMessageBytes),
+			)
+			return grpc.NewServer(opts...)
+		},
 	})
 }
 

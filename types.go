@@ -100,10 +100,21 @@ type NotificationRecord struct {
 }
 
 // PostMessageRequest carries the raw, gateway-schema-shaped JSON the agent
-// produced for the builtins.gateway.post tool. The gateway parses it (text,
-// channel override, attachments, …).
+// produced for the builtins.gateway.post tool (text, channel override, rich
+// layout) plus any squadron-resolved file attachments. The gateway parses
+// Payload and uploads each attachment's bytes directly — it never fetches a URL.
 type PostMessageRequest struct {
-	Payload string
+	Payload     string
+	Attachments []FileAttachment
+}
+
+// FileAttachment is a squadron-local file (memory/scratchpad/packet) that
+// squadron has already read and is shipping as raw bytes for the gateway to
+// upload to its external system.
+type FileAttachment struct {
+	Filename string
+	MimeType string
+	Content  []byte
 }
 
 // MessageToolSpec describes the builtins.gateway.post tool for one gateway.
