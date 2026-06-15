@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"testing"
 	"time"
 )
@@ -206,14 +207,40 @@ func TestNotificationFromProtoNilIsSafe(t *testing.T) {
 func TestPostMessageRoundTripPreservesPayload(t *testing.T) {
 	original := PostMessageRequest{Payload: `{"text":"deploy done","channel":"#ops"}`}
 	got := postMessageFromProto(postMessageToProto(original))
-	if got != original {
-		t.Errorf("payload must survive round-trip verbatim: got %+v, want %+v", got, original)
+	if got.Payload != original.Payload {
+		t.Errorf("payload must survive round-trip verbatim: got %q, want %q", got.Payload, original.Payload)
+	}
+	if len(got.Attachments) != 0 {
+		t.Errorf("no attachments expected, got %d", len(got.Attachments))
+	}
+}
+
+func TestPostMessageRoundTripPreservesAttachments(t *testing.T) {
+	original := PostMessageRequest{
+		Payload: `{"text":"report attached"}`,
+		Attachments: []FileAttachment{
+			{Filename: "report.pdf", MimeType: "application/pdf", Content: []byte{0x25, 0x50, 0x44, 0x46}},
+			{Filename: "chart.png", MimeType: "image/png", Content: []byte{0x89, 0x50, 0x4e, 0x47}},
+		},
+	}
+	got := postMessageFromProto(postMessageToProto(original))
+	if got.Payload != original.Payload {
+		t.Errorf("Payload: got %q, want %q", got.Payload, original.Payload)
+	}
+	if len(got.Attachments) != len(original.Attachments) {
+		t.Fatalf("Attachments length: got %d, want %d", len(got.Attachments), len(original.Attachments))
+	}
+	for i, a := range got.Attachments {
+		w := original.Attachments[i]
+		if a.Filename != w.Filename || a.MimeType != w.MimeType || !bytes.Equal(a.Content, w.Content) {
+			t.Errorf("Attachments[%d]: got %+v, want %+v", i, a, w)
+		}
 	}
 }
 
 func TestPostMessageFromProtoNilIsSafe(t *testing.T) {
 	got := postMessageFromProto(nil)
-	if got != (PostMessageRequest{}) {
+	if got.Payload != "" || len(got.Attachments) != 0 {
 		t.Errorf("nil request should yield zero-value PostMessageRequest, got %+v", got)
 	}
 }

@@ -50,9 +50,20 @@ service GatewayService {
 }
 
 // PostMessageRequest carries the raw, gateway-schema-shaped JSON the agent
-// produced. The gateway parses it (text, channel override, attachments, …).
+// produced (text, channel override, rich layout) plus any squadron-resolved
+// file attachments. The gateway parses payload and uploads each attachment's
+// bytes directly — it never fetches a URL.
 message PostMessageRequest {
     string payload = 1;
+    repeated FileAttachment attachments = 2;
+}
+
+// FileAttachment is a squadron-local file (memory/scratchpad/packet) that
+// squadron has already read and is shipping to the gateway as raw bytes.
+message FileAttachment {
+    string filename = 1;
+    string mime_type = 2;
+    bytes content = 3;
 }
 
 // MessageToolSpecResponse describes the builtins.gateway.post tool.
