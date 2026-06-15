@@ -118,6 +118,28 @@ func (s *gatewayServer) OnHumanInputResolved(ctx context.Context, p *pb.HumanInp
 	return &pb.Empty{}, nil
 }
 
+func (s *gatewayServer) OnNotification(ctx context.Context, p *pb.NotificationRecord) (*pb.Empty, error) {
+	if err := s.impl.OnNotification(ctx, notificationFromProto(p)); err != nil {
+		return nil, err
+	}
+	return &pb.Empty{}, nil
+}
+
+func (s *gatewayServer) PostMessage(ctx context.Context, p *pb.PostMessageRequest) (*pb.Empty, error) {
+	if err := s.impl.PostMessage(ctx, postMessageFromProto(p)); err != nil {
+		return nil, err
+	}
+	return &pb.Empty{}, nil
+}
+
+func (s *gatewayServer) MessageToolSpec(ctx context.Context, _ *pb.Empty) (*pb.MessageToolSpecResponse, error) {
+	spec, err := s.impl.MessageToolSpec(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return messageToolSpecToProto(spec), nil
+}
+
 func (s *gatewayServer) Shutdown(ctx context.Context, _ *pb.Empty) (*pb.Empty, error) {
 	if err := s.impl.Shutdown(ctx); err != nil {
 		return nil, err

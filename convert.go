@@ -57,6 +57,57 @@ func recordFromProto(p *pb.HumanInputRecord) HumanInputRecord {
 	}
 }
 
+func notificationToProto(r NotificationRecord) *pb.NotificationRecord {
+	return &pb.NotificationRecord{
+		MissionId:   r.MissionID,
+		MissionName: r.MissionName,
+		Event:       r.Event,
+		Title:       r.Title,
+		Message:     r.Message,
+		OccurredAt:  formatTime(r.OccurredAt),
+		Error:       r.Error,
+		Channel:     r.Channel,
+	}
+}
+
+func notificationFromProto(p *pb.NotificationRecord) NotificationRecord {
+	if p == nil {
+		return NotificationRecord{}
+	}
+	return NotificationRecord{
+		MissionID:   p.MissionId,
+		MissionName: p.MissionName,
+		Event:       p.Event,
+		Title:       p.Title,
+		Message:     p.Message,
+		OccurredAt:  parseTime(p.OccurredAt),
+		Error:       p.Error,
+		Channel:     p.Channel,
+	}
+}
+
+func postMessageToProto(r PostMessageRequest) *pb.PostMessageRequest {
+	return &pb.PostMessageRequest{Payload: r.Payload}
+}
+
+func postMessageFromProto(p *pb.PostMessageRequest) PostMessageRequest {
+	if p == nil {
+		return PostMessageRequest{}
+	}
+	return PostMessageRequest{Payload: p.Payload}
+}
+
+func messageToolSpecToProto(s MessageToolSpec) *pb.MessageToolSpecResponse {
+	return &pb.MessageToolSpecResponse{Description: s.Description, ParamsSchemaJson: s.ParamsSchema}
+}
+
+func messageToolSpecFromProto(p *pb.MessageToolSpecResponse) MessageToolSpec {
+	if p == nil {
+		return MessageToolSpec{}
+	}
+	return MessageToolSpec{Description: p.Description, ParamsSchema: p.ParamsSchemaJson}
+}
+
 func filterToProto(f HumanInputFilter) *pb.HumanInputFilter {
 	return &pb.HumanInputFilter{
 		State:       string(f.State),

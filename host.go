@@ -111,6 +111,27 @@ func (g *GRPCGatewayClient) OnHumanInputResolved(ctx context.Context, rec HumanI
 	return err
 }
 
+// OnNotification forwards a mission-lifecycle notification to the gateway.
+func (g *GRPCGatewayClient) OnNotification(ctx context.Context, rec NotificationRecord) error {
+	_, err := g.client.OnNotification(ctx, notificationToProto(rec))
+	return err
+}
+
+// PostMessage forwards a post request to the gateway.
+func (g *GRPCGatewayClient) PostMessage(ctx context.Context, req PostMessageRequest) error {
+	_, err := g.client.PostMessage(ctx, postMessageToProto(req))
+	return err
+}
+
+// MessageToolSpec fetches the post-tool spec from the gateway.
+func (g *GRPCGatewayClient) MessageToolSpec(ctx context.Context) (MessageToolSpec, error) {
+	resp, err := g.client.MessageToolSpec(ctx, &pb.Empty{})
+	if err != nil {
+		return MessageToolSpec{}, err
+	}
+	return messageToolSpecFromProto(resp), nil
+}
+
 // Shutdown asks the gateway to clean up before squadron kills the
 // subprocess. Best-effort — squadron should tear down the subprocess
 // regardless of return value.

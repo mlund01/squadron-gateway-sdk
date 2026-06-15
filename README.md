@@ -12,8 +12,14 @@ lifecycle as plugins) and connects to it over a bidirectional gRPC
 channel:
 
 - **Squadron → Gateway**: pushes events (`OnHumanInputRequested`,
-  `OnHumanInputResolved`, …) so the gateway can mirror state to its
-  external system.
+  `OnHumanInputResolved`, `OnNotification`, `PostMessage`, …) so the gateway
+  can mirror state to its external system. `OnNotification` is a one-way
+  mission-lifecycle post (`mission_completed` / `mission_failed`); `PostMessage`
+  posts an agent-authored message (backs the `builtins.gateway.post` tool). The
+  gateway owns the post-message contract: `MessageToolSpec` returns the tool
+  description + a JSON Schema squadron shows the LLM, and `PostMessage` receives
+  the raw JSON the agent produced for that schema, so each gateway defines
+  exactly the rich-message shape it accepts (text, embeds/blocks, attachments).
 - **Gateway → Squadron**: pulls / mutates state (`ListHumanInputs`,
   `ResolveHumanInput`, …) so user actions in the external system flow
   back to squadron.
@@ -50,10 +56,34 @@ func (g *myGateway) OnHumanInputResolved(ctx context.Context, rec gateway.HumanI
     return nil
 }
 
+func (g *myGateway) OnNotification(ctx context.Context, rec gateway.NotificationRecord) error {
+    // one-way mission-lifecycle post; rec.Channel optionally overrides the
+    // destination channel
+    g.post(rec)
+    return nil
+}
+
+func (g *myGateway) PostMessage(ctx context.Context, req gateway.PostMessageRequest) error {
+    // req.Payload is the raw JSON the agent produced for MessageToolSpec's
+    // schema — parse and render it however this gateway sees fit
+    g.send(req.Payload)
+    return nil
+}
+
+func (g *myGateway) MessageToolSpec(ctx context.Context) (gateway.MessageToolSpec, error) {
+    // tell the LLM how to format a message for this gateway
+    return gateway.MessageToolSpec{
+        Description:  "Post a message. `text` supports markdown.",
+        ParamsSchema: `{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}`,
+    }, nil
+}
+
 func (g *myGateway) Shutdown(ctx context.Context) error { return nil }
 
 func (g *myGateway) show(_ gateway.HumanInputRecord)         {}
 func (g *myGateway) markAnswered(_ gateway.HumanInputRecord) {}
+func (g *myGateway) post(_ gateway.NotificationRecord)       {}
+func (g *myGateway) send(_ string)                           {}
 
 func main() { gateway.Serve(&myGateway{}) }
 ```

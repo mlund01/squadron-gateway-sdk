@@ -22,9 +22,47 @@ service GatewayService {
     // should update its external system to reflect the answer.
     rpc OnHumanInputResolved(HumanInputRecord) returns (Empty);
 
+    // OnNotification is invoked when a mission reaches a terminal state
+    // (completed, failed, stopped) and the mission opted into gateway
+    // notifications. The gateway posts an informational message to its
+    // external system. Unlike human-input, notifications are one-way:
+    // there is nothing for the user to act on.
+    rpc OnNotification(NotificationRecord) returns (Empty);
+
+    // PostMessage posts a message to the gateway's external system. Squadron
+    // exposes this to agents via the builtins.gateway.post tool. The payload
+    // is the raw JSON the agent produced for the tool, matching the schema the
+    // gateway advertised via MessageToolSpec — the gateway owns the message
+    // contract (text, formatting, channel override, attachments, …) and parses
+    // the payload itself.
+    rpc PostMessage(PostMessageRequest) returns (Empty);
+
+    // MessageToolSpec returns how the builtins.gateway.post tool should be
+    // presented to the LLM for this gateway: a description (formatting docs)
+    // and an optional JSON Schema for the tool's parameters. Squadron fetches
+    // it once the gateway is up and builds the tool from it, so each gateway
+    // can advertise exactly the rich-message shape it accepts.
+    rpc MessageToolSpec(Empty) returns (MessageToolSpecResponse);
+
     // Shutdown asks the gateway to release external resources cleanly
     // before squadron tears down the subprocess.
     rpc Shutdown(Empty) returns (Empty);
+}
+
+// PostMessageRequest carries the raw, gateway-schema-shaped JSON the agent
+// produced. The gateway parses it (text, channel override, attachments, …).
+message PostMessageRequest {
+    string payload = 1;
+}
+
+// MessageToolSpecResponse describes the builtins.gateway.post tool.
+message MessageToolSpecResponse {
+    // description is appended to the tool description so the LLM knows how to
+    // format messages for this gateway.
+    string description = 1;
+    // params_schema_json is an optional JSON Schema (object) for the tool's
+    // parameters. Empty → squadron uses a default { message } schema.
+    string params_schema_json = 2;
 }
 
 // SquadronService is implemented by the host (squadron) and registered
@@ -112,4 +150,22 @@ message ResolveHumanInputResponse {
     // Gateways should treat this as a stale event (e.g. the row was
     // trimmed) rather than retry.
     bool not_found = 3;
+}
+
+// NotificationRecord describes a single mission-lifecycle notification.
+// All fields are flat strings so the schema stays language-neutral.
+message NotificationRecord {
+    string mission_id = 1;
+    string mission_name = 2;
+    // event is one of "mission_completed" or "mission_failed".
+    string event = 3;
+    string title = 4;
+    string message = 5;
+    string occurred_at = 6; // RFC3339Nano
+    // error is set for "mission_failed", empty otherwise.
+    string error = 7;
+    // channel is an optional per-mission destination override. When
+    // empty the gateway posts to its globally configured default
+    // channel.
+    string channel = 8;
 }

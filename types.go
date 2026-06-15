@@ -81,6 +81,41 @@ type HumanInputRecord struct {
 	ResponderUserID   string
 }
 
+// NotificationRecord describes a single mission-lifecycle notification
+// pushed to the gateway. Notifications are one-way and informational —
+// unlike human-input requests there is nothing for the user to resolve.
+type NotificationRecord struct {
+	MissionID   string
+	MissionName string
+	// Event is one of "mission_completed" or "mission_failed".
+	Event      string
+	Title      string
+	Message    string
+	OccurredAt time.Time
+	// Error is set when Event is "mission_failed", empty otherwise.
+	Error string
+	// Channel is an optional per-mission destination override. When
+	// empty the gateway posts to its globally configured default channel.
+	Channel string
+}
+
+// PostMessageRequest carries the raw, gateway-schema-shaped JSON the agent
+// produced for the builtins.gateway.post tool. The gateway parses it (text,
+// channel override, attachments, …).
+type PostMessageRequest struct {
+	Payload string
+}
+
+// MessageToolSpec describes the builtins.gateway.post tool for one gateway.
+type MessageToolSpec struct {
+	// Description is appended to the tool description so the LLM knows how to
+	// format messages for this gateway.
+	Description string
+	// ParamsSchema is an optional JSON Schema (object) for the tool's
+	// parameters. Empty → squadron's default { message } shape.
+	ParamsSchema string
+}
+
 // HumanInputFilter narrows a ListHumanInputs call. Zero-valued fields
 // are not applied (so a fresh HumanInputFilter{} returns everything).
 type HumanInputFilter struct {
@@ -160,6 +195,22 @@ type Gateway interface {
 	// commander operator, another gateway, the agent timing out).
 	// Gateways update their external surface to reflect the answer.
 	OnHumanInputResolved(ctx context.Context, rec HumanInputRecord) error
+
+	// OnNotification is invoked when a mission reaches a terminal state
+	// (completed, failed, stopped) and the mission opted into gateway
+	// notifications. Gateways post an informational message to their
+	// external system; there is nothing for the user to act on.
+	OnNotification(ctx context.Context, rec NotificationRecord) error
+
+	// PostMessage posts a message to the gateway's external system. The
+	// payload is the raw, gateway-schema-shaped JSON the agent produced for
+	// the builtins.gateway.post tool; the gateway parses it itself.
+	PostMessage(ctx context.Context, req PostMessageRequest) error
+
+	// MessageToolSpec returns the description + optional JSON Schema squadron
+	// uses to present the builtins.gateway.post tool to the LLM. Return a zero
+	// MessageToolSpec to accept squadron's default { message } shape.
+	MessageToolSpec(ctx context.Context) (MessageToolSpec, error)
 
 	// Shutdown is invoked once when squadron is tearing the subprocess
 	// down. Release external resources here (close the Discord

@@ -22,6 +22,9 @@ const (
 	GatewayService_Configure_FullMethodName             = "/gateway.GatewayService/Configure"
 	GatewayService_OnHumanInputRequested_FullMethodName = "/gateway.GatewayService/OnHumanInputRequested"
 	GatewayService_OnHumanInputResolved_FullMethodName  = "/gateway.GatewayService/OnHumanInputResolved"
+	GatewayService_OnNotification_FullMethodName        = "/gateway.GatewayService/OnNotification"
+	GatewayService_PostMessage_FullMethodName           = "/gateway.GatewayService/PostMessage"
+	GatewayService_MessageToolSpec_FullMethodName       = "/gateway.GatewayService/MessageToolSpec"
 	GatewayService_Shutdown_FullMethodName              = "/gateway.GatewayService/Shutdown"
 )
 
@@ -44,6 +47,25 @@ type GatewayServiceClient interface {
 	// some other surface (commander, another gateway). The gateway
 	// should update its external system to reflect the answer.
 	OnHumanInputResolved(ctx context.Context, in *HumanInputRecord, opts ...grpc.CallOption) (*Empty, error)
+	// OnNotification is invoked when a mission reaches a terminal state
+	// (completed, failed, stopped) and the mission opted into gateway
+	// notifications. The gateway posts an informational message to its
+	// external system. Unlike human-input, notifications are one-way:
+	// there is nothing for the user to act on.
+	OnNotification(ctx context.Context, in *NotificationRecord, opts ...grpc.CallOption) (*Empty, error)
+	// PostMessage posts a message to the gateway's external system. Squadron
+	// exposes this to agents via the builtins.gateway.post tool. The payload
+	// is the raw JSON the agent produced for the tool, matching the schema the
+	// gateway advertised via MessageToolSpec — the gateway owns the message
+	// contract (text, formatting, channel override, attachments, …) and parses
+	// the payload itself.
+	PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*Empty, error)
+	// MessageToolSpec returns how the builtins.gateway.post tool should be
+	// presented to the LLM for this gateway: a description (formatting docs)
+	// and an optional JSON Schema for the tool's parameters. Squadron fetches
+	// it once the gateway is up and builds the tool from it, so each gateway
+	// can advertise exactly the rich-message shape it accepts.
+	MessageToolSpec(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MessageToolSpecResponse, error)
 	// Shutdown asks the gateway to release external resources cleanly
 	// before squadron tears down the subprocess.
 	Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
@@ -87,6 +109,36 @@ func (c *gatewayServiceClient) OnHumanInputResolved(ctx context.Context, in *Hum
 	return out, nil
 }
 
+func (c *gatewayServiceClient) OnNotification(ctx context.Context, in *NotificationRecord, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, GatewayService_OnNotification_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) PostMessage(ctx context.Context, in *PostMessageRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, GatewayService_PostMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) MessageToolSpec(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MessageToolSpecResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MessageToolSpecResponse)
+	err := c.cc.Invoke(ctx, GatewayService_MessageToolSpec_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gatewayServiceClient) Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -116,6 +168,25 @@ type GatewayServiceServer interface {
 	// some other surface (commander, another gateway). The gateway
 	// should update its external system to reflect the answer.
 	OnHumanInputResolved(context.Context, *HumanInputRecord) (*Empty, error)
+	// OnNotification is invoked when a mission reaches a terminal state
+	// (completed, failed, stopped) and the mission opted into gateway
+	// notifications. The gateway posts an informational message to its
+	// external system. Unlike human-input, notifications are one-way:
+	// there is nothing for the user to act on.
+	OnNotification(context.Context, *NotificationRecord) (*Empty, error)
+	// PostMessage posts a message to the gateway's external system. Squadron
+	// exposes this to agents via the builtins.gateway.post tool. The payload
+	// is the raw JSON the agent produced for the tool, matching the schema the
+	// gateway advertised via MessageToolSpec — the gateway owns the message
+	// contract (text, formatting, channel override, attachments, …) and parses
+	// the payload itself.
+	PostMessage(context.Context, *PostMessageRequest) (*Empty, error)
+	// MessageToolSpec returns how the builtins.gateway.post tool should be
+	// presented to the LLM for this gateway: a description (formatting docs)
+	// and an optional JSON Schema for the tool's parameters. Squadron fetches
+	// it once the gateway is up and builds the tool from it, so each gateway
+	// can advertise exactly the rich-message shape it accepts.
+	MessageToolSpec(context.Context, *Empty) (*MessageToolSpecResponse, error)
 	// Shutdown asks the gateway to release external resources cleanly
 	// before squadron tears down the subprocess.
 	Shutdown(context.Context, *Empty) (*Empty, error)
@@ -137,6 +208,15 @@ func (UnimplementedGatewayServiceServer) OnHumanInputRequested(context.Context, 
 }
 func (UnimplementedGatewayServiceServer) OnHumanInputResolved(context.Context, *HumanInputRecord) (*Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method OnHumanInputResolved not implemented")
+}
+func (UnimplementedGatewayServiceServer) OnNotification(context.Context, *NotificationRecord) (*Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method OnNotification not implemented")
+}
+func (UnimplementedGatewayServiceServer) PostMessage(context.Context, *PostMessageRequest) (*Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method PostMessage not implemented")
+}
+func (UnimplementedGatewayServiceServer) MessageToolSpec(context.Context, *Empty) (*MessageToolSpecResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MessageToolSpec not implemented")
 }
 func (UnimplementedGatewayServiceServer) Shutdown(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method Shutdown not implemented")
@@ -216,6 +296,60 @@ func _GatewayService_OnHumanInputResolved_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_OnNotification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotificationRecord)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).OnNotification(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_OnNotification_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).OnNotification(ctx, req.(*NotificationRecord))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_PostMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PostMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).PostMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_PostMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).PostMessage(ctx, req.(*PostMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_MessageToolSpec_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).MessageToolSpec(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_MessageToolSpec_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).MessageToolSpec(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -252,6 +386,18 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "OnHumanInputResolved",
 			Handler:    _GatewayService_OnHumanInputResolved_Handler,
+		},
+		{
+			MethodName: "OnNotification",
+			Handler:    _GatewayService_OnNotification_Handler,
+		},
+		{
+			MethodName: "PostMessage",
+			Handler:    _GatewayService_PostMessage_Handler,
+		},
+		{
+			MethodName: "MessageToolSpec",
+			Handler:    _GatewayService_MessageToolSpec_Handler,
 		},
 		{
 			MethodName: "Shutdown",
