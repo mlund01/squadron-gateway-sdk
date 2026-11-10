@@ -7,14 +7,14 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/mlund01/squadron-gateway-sdk/proto"
 )
 
-// MaxGRPCMessageBytes is the gRPC message-size limit for the gateway<->squadron
-// channel. It is raised well above gRPC's 4 MB default so file attachments
-// (shipped as raw bytes in PostMessageRequest) fit. Squadron caps individual
-// attachments below this.
+// MaxGRPCMessageBytes limits each encoded gRPC message to 32 MiB, allowing
+// file attachments to travel with the message payload.
 const MaxGRPCMessageBytes = 32 << 20 // 32 MiB
 
 // Serve is the entry point for a gateway binary. Call it from main()
@@ -50,10 +50,7 @@ func handshake() plugin.HandshakeConfig {
 	}
 }
 
-// gatewayPluginImpl wires hashicorp/go-plugin to our Gateway interface.
-// On the plugin side it serves GatewayService; on the host side it
-// returns a GRPCClient that satisfies the host-facing gateway client
-// interface (defined in the squadron repo).
+// gatewayPluginImpl registers the gateway service with go-plugin.
 type gatewayPluginImpl struct {
 	plugin.Plugin
 	Impl Gateway
@@ -137,11 +134,12 @@ func (s *gatewayServer) OnNotification(ctx context.Context, p *pb.NotificationRe
 	return &pb.Empty{}, nil
 }
 
-func (s *gatewayServer) PostMessage(ctx context.Context, p *pb.PostMessageRequest) (*pb.Empty, error) {
-	if err := s.impl.PostMessage(ctx, postMessageFromProto(p)); err != nil {
+func (s *gatewayServer) PostMessage(ctx context.Context, p *pb.PostMessageRequest) (*pb.PostMessageResponse, error) {
+	resp, err := s.impl.PostMessage(ctx, postMessageFromProto(p))
+	if err != nil {
 		return nil, err
 	}
-	return &pb.Empty{}, nil
+	return &pb.PostMessageResponse{MessageId: resp.MessageID}, nil
 }
 
 func (s *gatewayServer) MessageToolSpec(ctx context.Context, _ *pb.Empty) (*pb.MessageToolSpecResponse, error) {
@@ -150,6 +148,17 @@ func (s *gatewayServer) MessageToolSpec(ctx context.Context, _ *pb.Empty) (*pb.M
 		return nil, err
 	}
 	return messageToolSpecToProto(spec), nil
+}
+
+func (s *gatewayServer) EditMessage(ctx context.Context, p *pb.EditMessageRequest) (*pb.Empty, error) {
+	editor, ok := s.impl.(Editor)
+	if !ok {
+		return nil, status.Error(codes.Unimplemented, "this gateway doesn't edit messages")
+	}
+	if err := editor.EditMessage(ctx, editMessageFromProto(p)); err != nil {
+		return nil, err
+	}
+	return &pb.Empty{}, nil
 }
 
 func (s *gatewayServer) Shutdown(ctx context.Context, _ *pb.Empty) (*pb.Empty, error) {

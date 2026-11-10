@@ -2,11 +2,6 @@
 // integrations that bridge Squadron to external systems (Discord, Slack,
 // PagerDuty, custom dashboards, …).
 //
-// Squadron loads a gateway the same way it loads a plugin — declared in
-// HCL with `gateway "name" { source = "github.com/..."; version = "..." }`,
-// downloaded from the GitHub release on first load, and run as a managed
-// subprocess for the lifetime of the squadron process.
-//
 // The protocol is bidirectional gRPC:
 //
 //   - Squadron pushes events to the gateway (OnHumanInputRequested,
@@ -51,14 +46,17 @@ const (
 	HumanInputStateResolved HumanInputState = "resolved"
 )
 
-// HumanInputRecord is the canonical view of a single ask_human request,
-// mirrored from squadron's store.
+// HumanInputRecord carries a question, its resolution, and its mission context.
 //
 // Timestamps are RFC3339Nano strings on the wire so the proto schema
 // stays language-neutral, but the SDK exposes them as time.Time on the
 // Go interface for convenience. Empty timestamps decode to the zero
 // time.Time.
 type HumanInputRecord struct {
+	// RunURL is the link to the individual run, when available.
+	RunURL string
+	// ThreadID identifies a Squadron mission thread: a chain of related mission runs.
+	ThreadID          string
 	ID                string
 	MissionID         string
 	MissionName       string
@@ -73,18 +71,22 @@ type HumanInputRecord struct {
 	// than exactly one. When true, the resolved Response is a JSON-
 	// encoded string array (e.g. `["A","C"]`); when false, Response is
 	// the single chosen string. Always false for free-text questions.
-	MultiSelect       bool
-	State             HumanInputState
-	RequestedAt       time.Time
-	ResolvedAt        time.Time // zero when State is open
-	Response          string
-	ResponderUserID   string
+	MultiSelect     bool
+	State           HumanInputState
+	RequestedAt     time.Time
+	ResolvedAt      time.Time // zero when State is open
+	Response        string
+	ResponderUserID string
 }
 
 // NotificationRecord describes a single mission-lifecycle notification
 // pushed to the gateway. Notifications are one-way and informational —
 // unlike human-input requests there is nothing for the user to resolve.
 type NotificationRecord struct {
+	// RunURL is the link to the individual run, when available.
+	RunURL string
+	// ThreadID identifies a Squadron mission thread: a chain of related mission runs.
+	ThreadID    string
 	MissionID   string
 	MissionName string
 	// Event is one of "mission_completed" or "mission_failed".
@@ -99,31 +101,60 @@ type NotificationRecord struct {
 	Channel string
 }
 
-// PostMessageRequest carries the raw, gateway-schema-shaped JSON the agent
-// produced for the builtins.gateway.post tool (text, channel override, rich
-// layout) plus any squadron-resolved file attachments. The gateway parses
-// Payload and uploads each attachment's bytes directly — it never fetches a URL.
+// PostMessageRequest supplies the message payload and file attachments.
+// The gateway interprets Payload using the schema advertised by MessageToolSpec.
 type PostMessageRequest struct {
+	// RunURL is the link to the individual run, when available.
+	RunURL string
+	// ThreadID identifies a Squadron mission thread: a chain of related mission runs.
+	ThreadID    string
 	Payload     string
 	Attachments []FileAttachment
+	// MissionID and TaskID attribute the post to its originating run and task.
+	// Empty when the post wasn't made inside a mission.
+	MissionID string
+	TaskID    string
 }
 
-// FileAttachment is a squadron-local file (memory/scratchpad/packet) that
-// squadron has already read and is shipping as raw bytes for the gateway to
-// upload to its external system.
+// PostMessageResponse identifies the message a post created or replaced, in
+// the gateway's own ID format, for a later EditMessageRequest. Empty when the
+// gateway doesn't identify messages.
+type PostMessageResponse struct {
+	MessageID string
+}
+
+// EditMessageRequest replaces the message identified by MessageID, using the
+// same payload format and attachment support as PostMessageRequest.
+// MissionID and TaskID identify the calling run and task.
+type EditMessageRequest struct {
+	// RunURL is the link to the individual run, when available.
+	RunURL string
+	// ThreadID identifies a Squadron mission thread: a chain of related mission runs.
+	ThreadID    string
+	MessageID   string
+	Payload     string
+	Attachments []FileAttachment
+	MissionID   string
+	TaskID      string
+}
+
+// Editor provides optional support for replacing posted messages.
+type Editor interface {
+	EditMessage(ctx context.Context, req EditMessageRequest) error
+}
+
+// FileAttachment supplies file content and metadata for upload by the gateway.
 type FileAttachment struct {
 	Filename string
 	MimeType string
 	Content  []byte
 }
 
-// MessageToolSpec describes the builtins.gateway.post tool for one gateway.
+// MessageToolSpec describes the message payload accepted by the gateway.
 type MessageToolSpec struct {
-	// Description is appended to the tool description so the LLM knows how to
-	// format messages for this gateway.
+	// Description explains how to compose a message payload.
 	Description string
-	// ParamsSchema is an optional JSON Schema (object) for the tool's
-	// parameters. Empty → squadron's default { message } shape.
+	// ParamsSchema optionally defines the message payload as a JSON Schema object.
 	ParamsSchema string
 }
 
@@ -170,10 +201,7 @@ type ResolveResult struct {
 	NotFound bool
 }
 
-// SquadronAPI is the squadron-side surface that gateways call into.
-// The list deliberately starts small; new capabilities (mission
-// management, dataset queries, cost reporting, …) are added here over
-// time without breaking existing gateways.
+// SquadronAPI provides question lookup and resolution to gateways.
 type SquadronAPI interface {
 	ListHumanInputs(ctx context.Context, filter HumanInputFilter) ([]HumanInputRecord, int /* total */, error)
 	ResolveHumanInput(ctx context.Context, toolCallID, response, responderUserID string) (ResolveResult, error)
@@ -213,14 +241,13 @@ type Gateway interface {
 	// external system; there is nothing for the user to act on.
 	OnNotification(ctx context.Context, rec NotificationRecord) error
 
-	// PostMessage posts a message to the gateway's external system. The
-	// payload is the raw, gateway-schema-shaped JSON the agent produced for
-	// the builtins.gateway.post tool; the gateway parses it itself.
-	PostMessage(ctx context.Context, req PostMessageRequest) error
+	// PostMessage posts a message and returns its ID for subsequent edits.
+	// The gateway interprets Payload according to its MessageToolSpec.
+	// MessageID is empty when the gateway does not provide message IDs.
+	PostMessage(ctx context.Context, req PostMessageRequest) (PostMessageResponse, error)
 
-	// MessageToolSpec returns the description + optional JSON Schema squadron
-	// uses to present the builtins.gateway.post tool to the LLM. Return a zero
-	// MessageToolSpec to accept squadron's default { message } shape.
+	// MessageToolSpec returns the payload description and optional JSON Schema
+	// accepted by PostMessage and EditMessage.
 	MessageToolSpec(ctx context.Context) (MessageToolSpec, error)
 
 	// Shutdown is invoked once when squadron is tearing the subprocess

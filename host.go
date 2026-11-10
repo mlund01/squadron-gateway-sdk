@@ -68,9 +68,7 @@ func (h *HostPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, 
 	}, nil
 }
 
-// GRPCGatewayClient is the host-side handle on a running gateway. It
-// is returned from plugin.NewClient(...).Client().Dispense(...) and
-// satisfies the GatewayClient interface that squadron uses.
+// GRPCGatewayClient forwards host requests to a running gateway over gRPC.
 type GRPCGatewayClient struct {
 	client            pb.GatewayServiceClient
 	broker            *plugin.GRPCBroker
@@ -117,10 +115,14 @@ func (g *GRPCGatewayClient) OnNotification(ctx context.Context, rec Notification
 	return err
 }
 
-// PostMessage forwards a post request to the gateway.
-func (g *GRPCGatewayClient) PostMessage(ctx context.Context, req PostMessageRequest) error {
-	_, err := g.client.PostMessage(ctx, postMessageToProto(req))
-	return err
+// PostMessage forwards a post request to the gateway and returns the posted
+// message's ID.
+func (g *GRPCGatewayClient) PostMessage(ctx context.Context, req PostMessageRequest) (PostMessageResponse, error) {
+	resp, err := g.client.PostMessage(ctx, postMessageToProto(req))
+	if err != nil {
+		return PostMessageResponse{}, err
+	}
+	return PostMessageResponse{MessageID: resp.GetMessageId()}, nil
 }
 
 // MessageToolSpec fetches the post-tool spec from the gateway.
@@ -132,9 +134,14 @@ func (g *GRPCGatewayClient) MessageToolSpec(ctx context.Context) (MessageToolSpe
 	return messageToolSpecFromProto(resp), nil
 }
 
-// Shutdown asks the gateway to clean up before squadron kills the
-// subprocess. Best-effort — squadron should tear down the subprocess
-// regardless of return value.
+// EditMessage asks the gateway to replace a message it posted. A gateway
+// that can't edit messages returns codes.Unimplemented.
+func (g *GRPCGatewayClient) EditMessage(ctx context.Context, req EditMessageRequest) error {
+	_, err := g.client.EditMessage(ctx, editMessageToProto(req))
+	return err
+}
+
+// Shutdown requests gateway cleanup and returns any RPC error.
 func (g *GRPCGatewayClient) Shutdown(ctx context.Context) error {
 	_, err := g.client.Shutdown(ctx, &pb.Empty{})
 	return err

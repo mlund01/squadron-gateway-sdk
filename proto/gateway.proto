@@ -11,9 +11,7 @@ service GatewayService {
     // the gateway can use to dial back for SquadronService access.
     rpc Configure(ConfigureRequest) returns (ConfigureResponse);
 
-    // OnHumanInputRequested is invoked when an agent calls the
-    // builtins.human.ask tool. The gateway should surface the question
-    // in its external system (Discord channel, Slack DM, etc).
+    // OnHumanInputRequested delivers a question for the gateway to present.
     rpc OnHumanInputRequested(HumanInputRecord) returns (Empty);
 
     // OnHumanInputResolved is invoked whenever a human-input request
@@ -29,57 +27,76 @@ service GatewayService {
     // there is nothing for the user to act on.
     rpc OnNotification(NotificationRecord) returns (Empty);
 
-    // PostMessage posts a message to the gateway's external system. Squadron
-    // exposes this to agents via the builtins.gateway.post tool. The payload
-    // is the raw JSON the agent produced for the tool, matching the schema the
-    // gateway advertised via MessageToolSpec — the gateway owns the message
-    // contract (text, formatting, channel override, attachments, …) and parses
-    // the payload itself.
-    rpc PostMessage(PostMessageRequest) returns (Empty);
+    // PostMessage posts a message using the payload format advertised by
+    // MessageToolSpec. The returned message ID can be used with EditMessage.
+    rpc PostMessage(PostMessageRequest) returns (PostMessageResponse);
 
-    // MessageToolSpec returns how the builtins.gateway.post tool should be
-    // presented to the LLM for this gateway: a description (formatting docs)
-    // and an optional JSON Schema for the tool's parameters. Squadron fetches
-    // it once the gateway is up and builds the tool from it, so each gateway
-    // can advertise exactly the rich-message shape it accepts.
+    // MessageToolSpec returns a description and optional JSON Schema for
+    // the message payload accepted by the gateway.
     rpc MessageToolSpec(Empty) returns (MessageToolSpecResponse);
+
+    // EditMessage replaces a posted message using the ID returned by PostMessage.
+    // Gateways with editing support implement this RPC.
+    rpc EditMessage(EditMessageRequest) returns (Empty);
 
     // Shutdown asks the gateway to release external resources cleanly
     // before squadron tears down the subprocess.
     rpc Shutdown(Empty) returns (Empty);
 }
 
-// PostMessageRequest carries the raw, gateway-schema-shaped JSON the agent
-// produced (text, channel override, rich layout) plus any squadron-resolved
-// file attachments. The gateway parses payload and uploads each attachment's
-// bytes directly — it never fetches a URL.
+// PostMessageRequest supplies the message payload and file attachments.
+// The gateway interprets payload using the schema advertised by MessageToolSpec.
 message PostMessageRequest {
+    // Link to the individual run, when available.
+    string run_url = 6;
+    // Identifies a Squadron mission thread: a chain of related mission runs.
+    string thread_id = 5;
     string payload = 1;
     repeated FileAttachment attachments = 2;
+    // The individual run and task that authored the post. Empty outside a mission.
+    string mission_id = 3;
+    string task_id = 4;
 }
 
-// FileAttachment is a squadron-local file (memory/scratchpad/packet) that
-// squadron has already read and is shipping to the gateway as raw bytes.
+// PostMessageResponse identifies the message a post created or replaced, in
+// the gateway's own ID format. Empty when the gateway doesn't identify
+// messages.
+message PostMessageResponse {
+    string message_id = 1;
+}
+
+// EditMessageRequest replaces the message identified by message_id, using the
+// same payload format and attachment support as PostMessageRequest.
+// mission_id and task_id identify the calling run and task.
+message EditMessageRequest {
+    // Link to the individual run, when available.
+    string run_url = 7;
+    // Identifies a Squadron mission thread: a chain of related mission runs.
+    string thread_id = 6;
+    string message_id = 1;
+    string payload = 2;
+    string mission_id = 3;
+    string task_id = 4;
+    repeated FileAttachment attachments = 5;
+}
+
+// FileAttachment supplies file content and metadata for upload by the gateway.
 message FileAttachment {
     string filename = 1;
     string mime_type = 2;
     bytes content = 3;
 }
 
-// MessageToolSpecResponse describes the builtins.gateway.post tool.
+// MessageToolSpecResponse describes the message payload accepted by the gateway.
 message MessageToolSpecResponse {
-    // description is appended to the tool description so the LLM knows how to
-    // format messages for this gateway.
+    // description explains how to compose a message payload.
     string description = 1;
-    // params_schema_json is an optional JSON Schema (object) for the tool's
-    // parameters. Empty → squadron uses a default { message } schema.
+    // params_schema_json optionally defines the message payload as a JSON Schema object.
     string params_schema_json = 2;
 }
 
-// SquadronService is implemented by the host (squadron) and registered
-// on a broker stream. Gateways dial it on startup to query / mutate
-// state. Designed to grow over time — additional capabilities (mission
-// listing, run, dataset queries, etc.) get appended here.
+// SquadronService provides question lookup and resolution through the host
+// broker stream.
 service SquadronService {
     // ListHumanInputs returns matching records. The `since` filter is
     // the primary catch-up mechanism: a gateway records the last event
@@ -106,10 +123,12 @@ message ConfigureResponse {
     string error = 2;
 }
 
-// HumanInputRecord mirrors the squadron-wire HumanInputRecord type.
-// Kept here as a gRPC-friendly message so the SDK doesn't pull in the
-// wire package's broader dependencies.
+// HumanInputRecord carries a question, its resolution, and its mission context.
 message HumanInputRecord {
+    // Link to the individual run, when available.
+    string run_url = 18;
+    // Identifies a Squadron mission thread: a chain of related mission runs.
+    string thread_id = 17;
     string id = 1;
     string mission_id = 2;
     string mission_name = 3;
@@ -166,6 +185,10 @@ message ResolveHumanInputResponse {
 // NotificationRecord describes a single mission-lifecycle notification.
 // All fields are flat strings so the schema stays language-neutral.
 message NotificationRecord {
+    // Link to the individual run, when available.
+    string run_url = 10;
+    // Identifies a Squadron mission thread: a chain of related mission runs.
+    string thread_id = 9;
     string mission_id = 1;
     string mission_name = 2;
     // event is one of "mission_completed" or "mission_failed".

@@ -15,11 +15,10 @@ channel:
   `OnHumanInputResolved`, `OnNotification`, `PostMessage`, …) so the gateway
   can mirror state to its external system. `OnNotification` is a one-way
   mission-lifecycle post (`mission_completed` / `mission_failed`); `PostMessage`
-  posts an agent-authored message (backs the `builtins.gateway.post` tool). The
-  gateway owns the post-message contract: `MessageToolSpec` returns the tool
-  description + a JSON Schema squadron shows the LLM, and `PostMessage` receives
-  the raw JSON the agent produced for that schema, so each gateway defines
-  exactly the rich-message shape it accepts (text, embeds/blocks, attachments).
+  posts a message using the payload format described by `MessageToolSpec`.
+  Each gateway defines the format it accepts (text, embeds/blocks, attachments).
+  `PostMessage` returns the posted message's ID; gateways implementing the
+  optional `Editor` interface accept that ID in `EditMessage` to replace it.
 - **Gateway → Squadron**: pulls / mutates state (`ListHumanInputs`,
   `ResolveHumanInput`, …) so user actions in the external system flow
   back to squadron.
@@ -63,15 +62,15 @@ func (g *myGateway) OnNotification(ctx context.Context, rec gateway.Notification
     return nil
 }
 
-func (g *myGateway) PostMessage(ctx context.Context, req gateway.PostMessageRequest) error {
-    // req.Payload is the raw JSON the agent produced for MessageToolSpec's
-    // schema — parse and render it however this gateway sees fit
-    g.send(req.Payload)
-    return nil
+func (g *myGateway) PostMessage(ctx context.Context, req gateway.PostMessageRequest) (gateway.PostMessageResponse, error) {
+    // Parse and render req.Payload using the format advertised by MessageToolSpec.
+    // Return the posted message's ID for subsequent EditMessage requests.
+    id := g.send(req.Payload)
+    return gateway.PostMessageResponse{MessageID: id}, nil
 }
 
 func (g *myGateway) MessageToolSpec(ctx context.Context) (gateway.MessageToolSpec, error) {
-    // tell the LLM how to format a message for this gateway
+    // Describe the message payload this gateway accepts.
     return gateway.MessageToolSpec{
         Description:  "Post a message. `text` supports markdown.",
         ParamsSchema: `{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}`,
@@ -83,10 +82,22 @@ func (g *myGateway) Shutdown(ctx context.Context) error { return nil }
 func (g *myGateway) show(_ gateway.HumanInputRecord)         {}
 func (g *myGateway) markAnswered(_ gateway.HumanInputRecord) {}
 func (g *myGateway) post(_ gateway.NotificationRecord)       {}
-func (g *myGateway) send(_ string)                           {}
+func (g *myGateway) send(_ string) string                    { return "" }
 
 func main() { gateway.Serve(&myGateway{}) }
 ```
+
+## Grouping related mission updates
+
+Gateway implementations use Squadron's mission threads to keep updates from
+related runs together. For example, the Slack gateway uses `ThreadID` to keep
+their posts, questions and notifications in a single Slack thread.
+
+The SDK carries `ThreadID` on posts, edits, questions and notifications.
+`MissionID` identifies the individual run, and `ToolCallID` identifies the
+question being answered. `RunURL` supplies an optional link to the individual
+run for display. Gateway implementations choose how to associate a
+mission thread with a conversation in their external system.
 
 ## Catch-up after disconnects
 

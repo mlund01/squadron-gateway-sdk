@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -22,6 +23,7 @@ func TestRecordRoundTripPreservesEveryField(t *testing.T) {
 	original := HumanInputRecord{
 		ID:                "id-1",
 		MissionID:         "m-1",
+		ThreadID:          "chain-1",
 		MissionName:       "research",
 		TaskID:            "t-1",
 		TaskName:          "scrape",
@@ -62,6 +64,7 @@ func TestRecordRoundTripPreservesEveryField(t *testing.T) {
 	}{
 		{"ID", got.ID, original.ID},
 		{"MissionID", got.MissionID, original.MissionID},
+		{"ThreadID", got.ThreadID, original.ThreadID},
 		{"MissionName", got.MissionName, original.MissionName},
 		{"TaskID", got.TaskID, original.TaskID},
 		{"TaskName", got.TaskName, original.TaskName},
@@ -164,6 +167,7 @@ func TestRecordFromProtoNilIsSafe(t *testing.T) {
 func TestNotificationRoundTripPreservesEveryField(t *testing.T) {
 	occurred := time.Now().UTC().Truncate(time.Nanosecond)
 	original := NotificationRecord{
+		ThreadID:    "chain-1",
 		MissionID:   "m-1",
 		MissionName: "critical",
 		Event:       "mission_failed",
@@ -261,5 +265,46 @@ func TestMessageToolSpecFromProtoNilIsSafe(t *testing.T) {
 	got := messageToolSpecFromProto(nil)
 	if got != (MessageToolSpec{}) {
 		t.Errorf("nil response should yield zero-value MessageToolSpec, got %+v", got)
+	}
+}
+
+func TestPostMessageRoundTripCarriesMissionContext(t *testing.T) {
+	in := PostMessageRequest{Payload: `{"text":"hi"}`, MissionID: "m-1",
+		ThreadID: "chain-1", TaskID: "t-1"}
+	got := postMessageFromProto(postMessageToProto(in))
+	if got.MissionID != "m-1" || got.ThreadID != "chain-1" || got.TaskID != "t-1" || got.Payload != in.Payload {
+		t.Errorf("got %+v", got)
+	}
+}
+
+func TestEditMessageRoundTripCarriesIDPayloadAttachmentsAndRun(t *testing.T) {
+	original := EditMessageRequest{
+		MessageID:   "C1/1700000000.000001",
+		Payload:     `{"text":"done"}`,
+		Attachments: []FileAttachment{{Filename: "report.txt", MimeType: "text/plain", Content: []byte("hello")}},
+		MissionID:   "run-1",
+		ThreadID:    "chain-1",
+		TaskID:      "task-1",
+	}
+	if got := editMessageFromProto(editMessageToProto(original)); !reflect.DeepEqual(got, original) {
+		t.Errorf("got %+v, want %+v", got, original)
+	}
+	if got := editMessageFromProto(nil); !reflect.DeepEqual(got, EditMessageRequest{}) {
+		t.Errorf("nil request should yield zero-value EditMessageRequest, got %+v", got)
+	}
+}
+
+func TestRunURLsSurviveWireConversion(t *testing.T) {
+	const want = "https://cc.example/instances/one/runs/run-1"
+	got := []string{
+		recordFromProto(recordToProto(HumanInputRecord{RunURL: want})).RunURL,
+		notificationFromProto(notificationToProto(NotificationRecord{RunURL: want})).RunURL,
+		postMessageFromProto(postMessageToProto(PostMessageRequest{RunURL: want})).RunURL,
+		editMessageFromProto(editMessageToProto(EditMessageRequest{RunURL: want})).RunURL,
+	}
+	for _, url := range got {
+		if url != want {
+			t.Fatalf("run URL lost in wire conversion: %q", url)
+		}
 	}
 }
